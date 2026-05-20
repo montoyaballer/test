@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>给你的</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      min-height: 100vh;
+      background: #080810;
+      color: #fff;
+      font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      overflow-x: hidden;
+    }
+
+    canvas#stars {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      z-index: 0;
+    }
+
+    canvas#fx {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    .container {
+      position: relative;
+      z-index: 1;
+      max-width: 420px;
+      margin: 0 auto;
+      padding: 56px 20px 96px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 28px;
+    }
+
+    /* ── 顶部标题 ── */
+    .page-title {
+      text-align: center;
+      letter-spacing: 6px;
+      font-size: 12px;
+      color: rgba(255,255,255,0.35);
+      text-transform: uppercase;
+    }
+
+    /* ── 分隔线装饰 ── */
+    .divider {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      opacity: 0.25;
+    }
+    .divider::before, .divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: linear-gradient(to right, transparent, #c084fc, transparent);
+    }
+    .divider span {
+      font-size: 10px;
+      color: #c084fc;
+      letter-spacing: 3px;
+    }
+
+    .hero {
+      position: relative;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    canvas#heart {
+      display: block;
+      width: 300px;
+      height: 280px;
+    }
+
+    .counter-overlay {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -44%);
+      text-align: center;
+      pointer-events: none;
+    }
+
+    .counter-label {
+      font-size: 11px;
+      letter-spacing: 5px;
+      color: #fff;
+      margin-bottom: 4px;
+      text-shadow: 0 0 10px rgba(0,0,0,1), 0 1px 4px rgba(0,0,0,1);
+    }
+
+    .counter-days {
+      font-size: 60px;
+      font-weight: 800;
+      line-height: 1;
+      color: #fff;
+      text-shadow: 0 0 24px rgba(255,150,180,0.9), 0 2px 6px rgba(0,0,0,0.9);
+    }
+
+    .counter-unit {
+      font-size: 13px;
+      color: #fff;
+      letter-spacing: 4px;
+      margin-top: 4px;
+      text-shadow: 0 0 10px rgba(0,0,0,1), 0 1px 4px rgba(0,0,0,1);
+    }
+
+    .counter-detail {
+      margin-top: 10px;
+      font-size: 11px;
+      color: #fff;
+      letter-spacing: 1px;
+      text-shadow: 0 0 10px rgba(0,0,0,1), 0 1px 4px rgba(0,0,0,1);
+    }
+
+    /* ── 日期徽章 ── */
+    .start-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(192,132,252,0.08);
+      border: 1px solid rgba(192,132,252,0.2);
+      border-radius: 100px;
+      padding: 8px 20px;
+      font-size: 13px;
+      color: rgba(255,255,255,0.6);
+      letter-spacing: 1px;
+    }
+    .start-badge span { color: #f9a8d4; }
+
+    /* ── 照片区 ── */
+    .photo-placeholder {
+      width: 100%;
+      aspect-ratio: 4/3;
+      border-radius: 24px;
+      background: linear-gradient(135deg, #12122a, #1a1030);
+      border: 1px solid rgba(192, 132, 252, 0.15);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      color: #3a3a5a;
+      font-size: 13px;
+    }
+
+    /* ── 卡片通用 ── */
+    .card {
+      width: 100%;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 24px;
+      padding: 28px 24px;
+      backdrop-filter: blur(4px);
+    }
+
+    .section-label {
+      font-size: 10px;
+      letter-spacing: 5px;
+      color: #c084fc;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .section-label::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: linear-gradient(to right, rgba(192,132,252,0.3), transparent);
+    }
+
+    .letter-body {
+      font-size: 15px;
+      line-height: 2.1;
+      color: #ddd;
+    }
+    .letter-body p + p { margin-top: 10px; }
+
+    /* ── 纪念日 ── */
+    .date-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 14px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      font-size: 14px;
+    }
+    .date-item:last-child { border-bottom: none; }
+    .date-name { color: #aaa; display: flex; align-items: center; gap: 8px; }
+    .date-dot {
+      width: 5px; height: 5px;
+      border-radius: 50%;
+      background: rgba(192,132,252,0.5);
+      flex-shrink: 0;
+    }
+    .date-val { color: #f9a8d4; font-variant-numeric: tabular-nums; }
+
+    /* ── 底部 ── */
+    .footer {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+    .footer-heart {
+      font-size: 16px;
+      animation: pulse 2s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); opacity: 0.6; }
+      50% { transform: scale(1.25); opacity: 1; }
+    }
+    .footer-text {
+      font-size: 11px;
+      color: #2a2a3a;
+      letter-spacing: 2px;
+    }
+  </style>
+</head>
+<body>
+
+<canvas id="stars"></canvas>
+<canvas id="fx"></canvas>
+
+<div class="container">
+
+  <div class="page-title">for you</div>
+
+  <div class="hero">
+    <canvas id="heart" width="320" height="300"></canvas>
+    <div class="counter-overlay">
+      <div class="counter-label">相遇</div>
+      <div class="counter-days" id="days">0</div>
+      <div class="counter-unit">天</div>
+      <div class="counter-detail" id="detail">计算中...</div>
+    </div>
+  </div>
+
+  <div class="start-badge">相遇于 <span>2026.05.20</span></div>
+
+  <div class="divider"><span>✦</span></div>
+
+  <div class="photo-placeholder">
+    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" opacity="0.4">
+      <rect x="3" y="3" width="18" height="18" rx="3"/>
+      <circle cx="8.5" cy="8.5" r="1.5"/>
+      <path d="M21 15l-5-5L5 21"/>
+    </svg>
+    <span>放一张你们的照片</span>
+  </div>
+
+  <div class="card">
+    <div class="section-label">写给你</div>
+    <div class="letter-body">
+      <p>遇见你之前，我以为自己挺习惯一个人的。</p>
+      <p>后来发现，只是还没遇到想分享的人。</p>
+      <p>现在有什么好玩的、好吃的、好看的，第一个想到的都是你。</p>
+      <p>不知道算不算喜欢，但我想让你知道这件事。</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="section-label">纪念日</div>
+    <div class="date-item">
+      <span class="date-name"><span class="date-dot"></span>相遇那天</span>
+      <span class="date-val">2026.05.20</span>
+    </div>
+    <div class="date-item">
+      <span class="date-name"><span class="date-dot"></span>100 天</span>
+      <span class="date-val" id="d100">—</span>
+    </div>
+    <div class="date-item">
+      <span class="date-name"><span class="date-dot"></span>半年</span>
+      <span class="date-val" id="d180">—</span>
+    </div>
+    <div class="date-item">
+      <span class="date-name"><span class="date-dot"></span>一年</span>
+      <span class="date-val" id="d365">—</span>
+    </div>
+  </div>
+
+  <div class="footer">
+    <div class="footer-heart">♡</div>
+    <div class="footer-text">made with code &amp; something more</div>
+  </div>
+
+</div>
+
+<script>
+  // ── 星空 ──
+  (function () {
+    const canvas = document.getElementById("stars");
+    const ctx = canvas.getContext("2d");
+    let stars = [];
+
+    function resize() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+
+    function initStars() {
+      stars = [];
+      const n = Math.floor(canvas.width * canvas.height / 5000);
+      for (let i = 0; i < n; i++) {
+        stars.push({
+          x: Math.random() * canvas.width,
+          y: Math.random() * canvas.height,
+          r: Math.random() * 1.1 + 0.2,
+          a: Math.random(),
+          da: (Math.random() * 0.004 + 0.001) * (Math.random() > 0.5 ? 1 : -1),
+        });
+      }
+    }
+
+    function drawStars() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      for (const s of stars) {
+        s.a += s.da;
+        if (s.a > 1 || s.a < 0) s.da *= -1;
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255,255,255,${s.a.toFixed(2)})`;
+        ctx.fill();
+      }
+      requestAnimationFrame(drawStars);
+    }
+
+    window.addEventListener("resize", () => { resize(); initStars(); });
+    resize(); initStars(); drawStars();
+  })();
+
+  // ── 立体花瓣心形 ──
+  (function () {
+    const canvas = document.getElementById("heart");
+    const ctx = canvas.getContext("2d");
+    const W = canvas.width, H = canvas.height;
+    const cx = W / 2, cy = H / 2 + 8;
+    const SCALE = 8.6;
+
+    // 心形参数方程（归一化坐标）
+    function heartXY(t) {
+      const x = 16 * Math.pow(Math.sin(t), 3);
+      const y = -(13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t));
+      return [x, y];
+    }
+
+    // 射线法：归一化坐标系内判断
+    const OUTLINE_N = 600;
+    const outlineNorm = Array.from({length: OUTLINE_N}, (_, i) => heartXY(i * 2 * Math.PI / OUTLINE_N));
+
+    function insideHeart(nx, ny) {
+      let inside = false, j = OUTLINE_N - 1;
+      for (let i = 0; i < OUTLINE_N; i++) {
+        const [xi, yi] = outlineNorm[i], [xj, yj] = outlineNorm[j];
+        if ((yi > ny) !== (yj > ny) && nx < (xj - xi) * (ny - yi) / (yj - yi) + xi)
+          inside = !inside;
+        j = i;
+      }
+      return inside;
+    }
+
+    // 生成填充点（归一化坐标），记录到心形中心的距离用于立体感
+    function genFillPts() {
+      const pts = [];
+      const step = 1.1;
+      for (let nx = -17; nx <= 17; nx += step) {
+        for (let ny = -13; ny <= 18; ny += step) {
+          if (insideHeart(nx, ny)) {
+            // 到心形"球心"的归一化距离，用于模拟球面凸起
+            const distFromCenter = Math.sqrt((nx * nx) / (16 * 16) + ((ny - 2) * (ny - 2)) / (14 * 14)) * 0.85;
+            pts.push({ nx, ny, distFromCenter });
+          }
+        }
+      }
+      return pts;
+    }
+
+    const fillPts = genFillPts();
+
+    // 绘制单片立体花瓣（真实感增强版）
+    // depth: 0(边缘/远) ~ 1(中心/近)
+    function drawPetal(x, y, size, rot, hue, alpha, depth, frame) {
+      ctx.save();
+      ctx.translate(x, y);
+      // 轻微自旋飘动，settled后也有微动
+      const spin = 0.018 * Math.sin((frame || 0) * 0.09 + x * 0.07);
+      ctx.rotate(rot + spin);
+      ctx.globalAlpha = alpha;
+
+      const w = size * 0.46, h = size;
+
+      // 真实花瓣路径：宽椭圆+顶部深凹口+边缘微波浪
+      ctx.beginPath();
+      ctx.moveTo(0, h * 0.52);
+      // 右侧
+      ctx.bezierCurveTo( w * 1.18,  h * 0.16,  w * 0.95, -h * 0.26,  w * 0.30, -h * 0.50);
+      ctx.bezierCurveTo( w * 0.10, -h * 0.66,  0,        -h * 0.55,  0,        -h * 0.44);
+      // 左侧（镜像）
+      ctx.bezierCurveTo( 0,        -h * 0.55, -w * 0.10, -h * 0.66, -w * 0.30, -h * 0.50);
+      ctx.bezierCurveTo(-w * 0.95, -h * 0.26, -w * 1.18,  h * 0.16,  0,         h * 0.52);
+      ctx.closePath();
+
+      // 立体渐变：左上光源，亮暗对比强
+      const baseLit = 42 + depth * 38;        // 42%~80%
+      const hiLit   = Math.min(100, baseLit + 38);
+      const shadLit = Math.max(14, baseLit - 30);
+
+      const grad = ctx.createLinearGradient(-w * 0.8, -h * 0.48, w * 0.65, h * 0.52);
+      grad.addColorStop(0,    `hsla(${hue + 10}, 92%, ${hiLit}%, 1)`);
+      grad.addColorStop(0.28, `hsla(${hue + 3},  86%, ${baseLit + 8}%, 1)`);
+      grad.addColorStop(0.58, `hsla(${hue - 6},  78%, ${baseLit - 10}%, 1)`);
+      grad.addColorStop(1,    `hsla(${hue - 22}, 65%, ${shadLit}%, 1)`);
+      ctx.fillStyle = grad;
+      ctx.fill();
+
+      // 边缘描边（深色轮廓）
+      ctx.strokeStyle = `hsla(${hue - 28}, 55%, ${shadLit - 5}%, 0.45)`;
+      ctx.lineWidth = 0.7;
+      ctx.stroke();
+
+      // 中脉主线
+      ctx.beginPath();
+      ctx.moveTo(0, h * 0.40);
+      ctx.quadraticCurveTo(w * 0.05, 0, 0, -h * 0.42);
+      ctx.strokeStyle = `hsla(${hue + 18}, 95%, ${hiLit + 4}%, 0.7)`;
+      ctx.lineWidth = 0.85;
+      ctx.stroke();
+
+      // 侧脉
+      ctx.lineWidth = 0.4;
+      ctx.strokeStyle = `hsla(${hue + 12}, 88%, ${hiLit}%, 0.45)`;
+      for (let s = -1; s <= 1; s += 2) {
+        ctx.beginPath();
+        ctx.moveTo(0, h * 0.10);
+        ctx.quadraticCurveTo(s * w * 0.55, -h * 0.08, s * w * 0.72, -h * 0.28);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(0, h * 0.28);
+        ctx.quadraticCurveTo(s * w * 0.60, h * 0.12, s * w * 0.80, -h * 0.04);
+        ctx.stroke();
+      }
+
+      // 高光光泽椭圆（所有花瓣都显示）
+      ctx.beginPath();
+      ctx.ellipse(-w * 0.30, -h * 0.20, w * 0.26, h * 0.14, -0.52, 0, Math.PI * 2);
+      ctx.fillStyle = `hsla(${hue + 22}, 98%, 99%, ${0.25 + depth * 0.50})`;
+      ctx.fill();
+
+      // 次高光
+      if (depth > 0.2) {
+        ctx.beginPath();
+        ctx.ellipse(w * 0.08, h * 0.05, w * 0.14, h * 0.08, 0.3, 0, Math.PI * 2);
+        ctx.fillStyle = `hsla(${hue + 15}, 90%, 97%, ${(depth - 0.2) * 0.40})`;
+        ctx.fill();
+      }
+
+      ctx.restore();
+    }
+
+    // 构建花瓣对象
+    const petals = fillPts.map((pt, i) => {
+      // 立体深度：中心凸起，边缘凹陷
+      const depth = Math.max(0, 1 - pt.distFromCenter * 1.0);
+      // 花瓣大小随深度变化（近大远小）
+      const baseSize = (11 + depth * 16) * (SCALE / 8.6);
+      // 颜色：中心偏粉白，边缘偏深玫红
+      const hue = 338 - depth * 12 + Math.random() * 14;
+
+      const angle = Math.random() * Math.PI * 2;
+      const spawnDist = 160 + Math.random() * 180;
+
+      return {
+        // 目标（归一化 → 画布坐标）
+        tnx: pt.nx, tny: pt.ny,
+        tx: cx + pt.nx * SCALE,
+        ty: cy + pt.ny * SCALE,
+        // 当前位置（从四周散开处出发）
+        x: cx + Math.cos(angle) * spawnDist,
+        y: cy + Math.sin(angle) * spawnDist,
+        vx: 0, vy: 0,
+        // 旋转：目标朝向 + 飘落时自旋
+        targetRot: Math.random() * Math.PI * 2,
+        rot: Math.random() * Math.PI * 2,
+        size: baseSize,
+        hue,
+        depth,
+        alpha: 0,
+        phase: "gather",
+        delay: i * 1.1 + Math.random() * 500,
+        pulseOff: Math.random() * Math.PI * 2,
+        floatOff: Math.random() * Math.PI * 2,
+      };
+    });
+
+    // 按深度排序：先画远处（depth小）再画近处（depth大），实现遮挡关系
+    petals.sort((a, b) => a.depth - b.depth);
+
+    // ── 装饰：流星 + 飘落花瓣 + 光点 ──
+    function newMeteor() {
+      return {
+        x: Math.random() * W, y: -20,
+        vx: (Math.random() - 0.5) * 1.6,
+        vy: 1.6 + Math.random() * 2.4,
+        len: 28 + Math.random() * 44,
+        alpha: 0.55 + Math.random() * 0.4,
+        hue: 315 + Math.random() * 55,
+        life: 0, maxLife: 55 + Math.random() * 100,
+      };
+    }
+    function newDriftPetal() {
+      return {
+        x: Math.random() * W, y: -18,
+        vx: (Math.random() - 0.5) * 0.7,
+        vy: 0.5 + Math.random() * 0.9,
+        rot: Math.random() * Math.PI * 2,
+        rotV: (Math.random() - 0.5) * 0.04,
+        size: 5 + Math.random() * 7,
+        hue: 330 + Math.random() * 22,
+        alpha: 0.55 + Math.random() * 0.35,
+        sway: Math.random() * Math.PI * 2,
+        life: 0, maxLife: 180 + Math.random() * 200,
+      };
+    }
+    function newSparkle() {
+      return {
+        x: Math.random() * W, y: Math.random() * H,
+        r: 0.8 + Math.random() * 1.6,
+        hue: 320 + Math.random() * 50,
+        alpha: 0,
+        dAlpha: 0.02 + Math.random() * 0.03,
+        phase: "in",
+        life: 0, maxLife: 60 + Math.random() * 80,
+      };
+    }
+
+    const meteors      = Array.from({length: 10}, newMeteor);
+    const driftPetals  = Array.from({length: 14}, newDriftPetal);
+    const sparkles     = Array.from({length: 22}, newSparkle);
+
+    function drawDecorations() {
+      // 流星
+      for (let i = 0; i < meteors.length; i++) {
+        const m = meteors[i];
+        m.life++; m.x += m.vx; m.y += m.vy;
+        const a = m.alpha * (1 - m.life / m.maxLife);
+        if (a > 0.015) {
+          ctx.save();
+          ctx.globalAlpha = a;
+          const g = ctx.createLinearGradient(m.x, m.y, m.x - m.vx * m.len, m.y - m.vy * m.len);
+          g.addColorStop(0, `hsl(${m.hue}, 95%, 90%)`);
+          g.addColorStop(1, `hsla(${m.hue}, 85%, 72%, 0)`);
+          ctx.strokeStyle = g;
+          ctx.lineWidth = 1.6;
+          ctx.beginPath();
+          ctx.moveTo(m.x, m.y);
+          ctx.lineTo(m.x - m.vx * m.len, m.y - m.vy * m.len);
+          ctx.stroke();
+          ctx.restore();
+        }
+        if (m.life >= m.maxLife) meteors[i] = newMeteor();
+      }
+
+      // 飘落花瓣
+      for (let i = 0; i < driftPetals.length; i++) {
+        const p = driftPetals[i];
+        p.life++; p.sway += 0.022;
+        p.x += p.vx + Math.sin(p.sway) * 0.55;
+        p.y += p.vy;
+        p.rot += p.rotV;
+        const a = p.alpha * Math.min(1, p.life / 30) * (1 - Math.max(0, p.life - p.maxLife + 40) / 40);
+        if (a > 0.01) drawPetal(p.x, p.y, p.size, p.rot, p.hue, a, 0.3, frame);
+        if (p.life >= p.maxLife || p.y > H + 20) driftPetals[i] = newDriftPetal();
+      }
+
+      // 光点闪烁
+      for (let i = 0; i < sparkles.length; i++) {
+        const s = sparkles[i];
+        s.life++;
+        if (s.phase === "in") {
+          s.alpha = Math.min(0.9, s.alpha + s.dAlpha);
+          if (s.alpha >= 0.9) s.phase = "out";
+        } else {
+          s.alpha = Math.max(0, s.alpha - s.dAlpha * 0.7);
+        }
+        if (s.alpha > 0.01) {
+          ctx.save();
+          ctx.globalAlpha = s.alpha;
+          const g = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, s.r * 3);
+          g.addColorStop(0, `hsl(${s.hue}, 95%, 95%)`);
+          g.addColorStop(1, `hsla(${s.hue}, 80%, 75%, 0)`);
+          ctx.fillStyle = g;
+          ctx.beginPath();
+          ctx.arc(s.x, s.y, s.r * 3, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        }
+        if (s.life >= s.maxLife) sparkles[i] = newSparkle();
+      }
+    }
+
+
+
+    let frame = 0;
+    let settledCount = 0;
+
+    function draw() {
+      ctx.clearRect(0, 0, W, H);
+      frame++;
+
+      // 心跳：双峰模拟真实心跳节律
+      const t = frame * 0.055;
+      const beat = 1 + 0.05 * Math.max(0, Math.sin(t)) * Math.max(0, Math.sin(t * 2));
+
+      // 外发光晕（聚拢完成后出现）
+      if (settledCount > petals.length * 0.9) {
+        const glowR = 118 * beat;
+        const glow = ctx.createRadialGradient(cx, cy - 8, 0, cx, cy - 8, glowR);
+        glow.addColorStop(0,   "rgba(255,90,150,0.14)");
+        glow.addColorStop(0.45,"rgba(255,60,120,0.07)");
+        glow.addColorStop(1,   "rgba(255,60,120,0)");
+        ctx.fillStyle = glow;
+        ctx.beginPath();
+        ctx.arc(cx, cy - 8, glowR, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      settledCount = 0;
+
+      for (const p of petals) {
+        if (frame < p.delay / 16) continue;
+
+        if (p.phase === "gather") {
+          p.alpha = Math.min(1, p.alpha + 0.035);
+          const dx = p.tx - p.x, dy = p.ty - p.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          // 弹性吸引
+          const f = Math.min(0.15, 0.008 + 60 / (dist + 1) * 0.012);
+          p.vx = p.vx * 0.84 + dx * f;
+          p.vy = p.vy * 0.84 + dy * f;
+          p.x += p.vx;
+          p.y += p.vy;
+          // 旋转向目标角度靠拢
+          let dr = p.targetRot - p.rot;
+          while (dr > Math.PI) dr -= Math.PI * 2;
+          while (dr < -Math.PI) dr += Math.PI * 2;
+          p.rot += dr * 0.06 + 0.02;
+          if (dist < 1.8) { p.x = p.tx; p.y = p.ty; p.rot = p.targetRot; p.phase = "settled"; }
+        } else {
+          settledCount++;
+          // 心跳缩放（深度越大跳动幅度越大，强化立体感）
+          const beatLocal = 1 + (beat - 1) * (0.6 + p.depth * 0.8);
+          const px = cx + (p.tx - cx) * beatLocal;
+          const py = cy + (p.ty - cy) * beatLocal;
+          // 微漂浮
+          const drift  = (0.3 + p.depth * 0.4) * Math.sin(frame * 0.016 + p.floatOff);
+          const driftY = (0.2 + p.depth * 0.3) * Math.cos(frame * 0.020 + p.floatOff);
+          p.x = px + drift;
+          p.y = py + driftY;
+          p.alpha = 0.78 + 0.20 * Math.sin(frame * 0.024 + p.pulseOff);
+        }
+
+        drawPetal(p.x, p.y, p.size, p.rot, p.hue, p.alpha, p.depth, frame);
+      }
+
+      drawDecorations();
+
+      requestAnimationFrame(draw);
+    }
+
+    draw();
+  })();
+
+  // ── 计时器 ──
+  const START = new Date("2026-05-20T00:00:00+08:00").getTime();
+
+  function pad(n) { return String(n).padStart(2, "0"); }
+
+  function formatDate(ts) {
+    const d = new Date(ts);
+    return `${d.getFullYear()}.${pad(d.getMonth()+1)}.${pad(d.getDate())}`;
+  }
+
+  function update() {
+    const diff = Math.max(0, Date.now() - START);
+    const s = Math.floor(diff / 1000);
+    const days  = Math.floor(s / 86400);
+    const hours = Math.floor((s % 86400) / 3600);
+    const mins  = Math.floor((s % 3600) / 60);
+    const secs  = s % 60;
+
+    document.getElementById("days").textContent = days;
+    document.getElementById("detail").textContent =
+      `${pad(hours)} 时 ${pad(mins)} 分 ${pad(secs)} 秒`;
+
+    document.getElementById("d100").textContent = formatDate(START + 99  * 86400000);
+    document.getElementById("d180").textContent = formatDate(START + 179 * 86400000);
+    document.getElementById("d365").textContent = formatDate(START + 364 * 86400000);
+  }
+
+  update();
+  setInterval(update, 1000);
+
+  // ── 烟花 + 飘落花朵 ──
+  (function () {
+    const canvas = document.getElementById("fx");
+    const ctx = canvas.getContext("2d");
+
+    function resize() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    window.addEventListener("resize", resize);
+    resize();
+
+    // ── 烟花粒子 ──
+    const fireworks = [];
+
+    function launchFirework() {
+      const x = canvas.width * (0.15 + Math.random() * 0.7);
+      const y = canvas.height * (0.08 + Math.random() * 0.35);
+      const hue = [350, 330, 310, 20, 45][Math.floor(Math.random() * 5)];
+      const count = 28 + Math.floor(Math.random() * 18);
+      for (let i = 0; i < count; i++) {
+        const angle = (i / count) * Math.PI * 2;
+        const speed = 1.8 + Math.random() * 2.8;
+        fireworks.push({
+          x, y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          alpha: 1,
+          hue: hue + (Math.random() - 0.5) * 30,
+          r: 1.5 + Math.random() * 1.5,
+          tail: [],
+          type: Math.random() < 0.4 ? "heart" : "dot",
+        });
+      }
+    }
+
+    // 小心形粒子路径
+    function heartPath(ctx, x, y, s) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.scale(s, s);
+      ctx.beginPath();
+      ctx.moveTo(0, -0.5);
+      ctx.bezierCurveTo( 0.5, -1,  1,  0,  0,  0.8);
+      ctx.bezierCurveTo(-1,   0, -0.5, -1,  0, -0.5);
+      ctx.restore();
+    }
+
+    // ── 飘落花朵 ──
+    const blooms = [];
+
+    function newBloom() {
+      return {
+        x: Math.random() * canvas.width,
+        y: -20,
+        vx: (Math.random() - 0.5) * 0.8,
+        vy: 0.6 + Math.random() * 1.0,
+        rot: Math.random() * Math.PI * 2,
+        rotV: (Math.random() - 0.5) * 0.03,
+        size: 6 + Math.random() * 8,
+        hue: 330 + Math.random() * 40,
+        alpha: 0.7 + Math.random() * 0.3,
+        sway: Math.random() * Math.PI * 2,
+        petals: 5,
+        life: 0,
+        maxLife: 220 + Math.random() * 180,
+      };
+    }
+
+    function drawBloom(b) {
+      ctx.save();
+      ctx.translate(b.x, b.y);
+      ctx.rotate(b.rot);
+      ctx.globalAlpha = b.alpha * Math.min(1, b.life / 20) * (1 - Math.max(0, b.life - b.maxLife + 30) / 30);
+      const n = b.petals;
+      const r = b.size;
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * Math.PI * 2;
+        ctx.save();
+        ctx.rotate(a);
+        ctx.beginPath();
+        ctx.ellipse(0, -r * 0.55, r * 0.28, r * 0.55, 0, 0, Math.PI * 2);
+        const g = ctx.createRadialGradient(0, -r * 0.3, 0, 0, -r * 0.55, r * 0.55);
+        g.addColorStop(0, `hsla(${b.hue + 15}, 95%, 90%, 1)`);
+        g.addColorStop(1, `hsla(${b.hue - 10}, 80%, 60%, 1)`);
+        ctx.fillStyle = g;
+        ctx.fill();
+        ctx.restore();
+      }
+      // 花心
+      ctx.beginPath();
+      ctx.arc(0, 0, r * 0.22, 0, Math.PI * 2);
+      ctx.fillStyle = `hsla(${b.hue + 30}, 100%, 88%, 0.9)`;
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // 初始化一批花朵错开出现
+    for (let i = 0; i < 10; i++) {
+      const bl = newBloom();
+      bl.y = Math.random() * canvas.height;
+      bl.life = Math.floor(Math.random() * 80);
+      blooms.push(bl);
+    }
+
+    // 烟花定时发射
+    let fwTimer = 0;
+    const FW_INTERVAL = 180; // 帧数间隔
+
+    function tick() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      fwTimer++;
+
+      // 发射烟花
+      if (fwTimer % FW_INTERVAL === 0) launchFirework();
+
+      // 更新烟花粒子
+      for (let i = fireworks.length - 1; i >= 0; i--) {
+        const p = fireworks[i];
+        p.tail.push({ x: p.x, y: p.y });
+        if (p.tail.length > 5) p.tail.shift();
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += 0.06;
+        p.vx *= 0.97;
+        p.alpha -= 0.018;
+        if (p.alpha <= 0) { fireworks.splice(i, 1); continue; }
+
+        // 拖尾
+        for (let t = 0; t < p.tail.length; t++) {
+          const ta = (t / p.tail.length) * p.alpha * 0.4;
+          ctx.beginPath();
+          ctx.arc(p.tail[t].x, p.tail[t].y, p.r * 0.5, 0, Math.PI * 2);
+          ctx.fillStyle = `hsla(${p.hue}, 90%, 75%, ${ta})`;
+          ctx.fill();
+        }
+
+        // 粒子本体
+        ctx.globalAlpha = p.alpha;
+        if (p.type === "heart") {
+          heartPath(ctx, p.x, p.y, p.r * 2.2);
+          ctx.fillStyle = `hsl(${p.hue}, 95%, 78%)`;
+          ctx.fill();
+        } else {
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+          ctx.fillStyle = `hsl(${p.hue}, 90%, 80%)`;
+          ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+      }
+
+      // 更新飘落花朵
+      for (let i = 0; i < blooms.length; i++) {
+        const b = blooms[i];
+        b.life++;
+        b.sway += 0.018;
+        b.x += b.vx + Math.sin(b.sway) * 0.5;
+        b.y += b.vy;
+        b.rot += b.rotV;
+        drawBloom(b);
+        if (b.life >= b.maxLife || b.y > canvas.height + 30) {
+          blooms[i] = newBloom();
+        }
+      }
+
+      requestAnimationFrame(tick);
+    }
+
+    // 页面加载后稍作延迟再发第一发烟花，避免和心形动画抢镜
+    setTimeout(launchFirework, 1200);
+    setTimeout(launchFirework, 2800);
+    tick();
+  })();
+</script>
+
+</body>
+</html>
