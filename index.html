@@ -884,88 +884,157 @@
   setInterval(update, 1000);
 
   // ── 照片轮播 ──
-  const STORAGE_KEY = 'lovePhotos';
-  let photos = [];
-  let current = 0;
+  // 使用 IndexedDB 存储（容量远大于 localStorage）
+  const DB_NAME = 'lovePhotoDB';
+  const DB_VER  = 1;
+  const STORE   = 'photos';       // 存每张图的 { id, order, blob }
+  const META    = 'meta';         // 存 { key:'order', value:[id,...] }
 
-  // ── localStorage 持久化 ──
-  function savePhotos() {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(photos));
-    } catch (e) {
-      // QuotaExceededError：存储已满，给出提示但不中断
-      if (e.name === 'QuotaExceededError' || e.code === 22) {
-        alert('浏览器存储空间不足，最新添加的照片无法保存。建议删除部分旧照片后再试。');
-      }
-    }
+  let db = null;
+  let photoOrder = [];            // id 有序列表
+  let blobURLs   = {};            // id → objectURL（仅内存，不持久化）
+  let current    = 0;
+
+  // ── 打开 DB ──
+  function openDB() {
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(DB_NAME, DB_VER);
+      req.onupgradeneeded = e => {
+        const d = e.target.result;
+        if (!d.objectStoreNames.contains(STORE)) d.createObjectStore(STORE, { keyPath: 'id' });
+        if (!d.objectStoreNames.contains(META))  d.createObjectStore(META,  { keyPath: 'key' });
+      };
+      req.onsuccess = e => resolve(e.target.result);
+      req.onerror   = e => reject(e.target.error);
+    });
   }
 
-  function loadPhotos() {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) return parsed;
-      }
-    } catch (_) {}
-    return [];
+  function tx(storeNames, mode) {
+    return db.transaction(storeNames, mode);
+  }
+
+  // ── 保存顺序表 ──
+  function saveOrder() {
+    return new Promise((resolve, reject) => {
+      const t = tx(META, 'readwrite');
+      t.objectStore(META).put({ key: 'order', value: photoOrder });
+      t.oncomplete = resolve;
+      t.onerror    = e => reject(e.target.error);
+    });
+  }
+
+  // ── 加载顺序表 ──
+  function loadOrder() {
+    return new Promise((resolve, reject) => {
+      const req = tx(META, 'readonly').objectStore(META).get('order');
+      req.onsuccess = e => resolve(e.target.result ? e.target.result.value : []);
+      req.onerror   = e => reject(e.target.error);
+    });
+  }
+
+  // ── 存一条图片记录 ──
+  function putPhoto(id, blob) {
+    return new Promise((resolve, reject) => {
+      const t = tx(STORE, 'readwrite');
+      t.objectStore(STORE).put({ id, blob });
+      t.oncomplete = resolve;
+      t.onerror    = e => reject(e.target.error);
+    });
+  }
+
+  // ── 删一条图片记录 ──
+  function removePhoto(id) {
+    return new Promise((resolve, reject) => {
+      const t = tx(STORE, 'readwrite');
+      t.objectStore(STORE).delete(id);
+      t.oncomplete = resolve;
+      t.onerror    = e => reject(e.target.error);
+    });
+  }
+
+  // ── 读取一条图片（返回 objectURL） ──
+  function fetchBlobURL(id) {
+    return new Promise((resolve, reject) => {
+      if (blobURLs[id]) { resolve(blobURLs[id]); return; }
+      const req = tx(STORE, 'readonly').objectStore(STORE).get(id);
+      req.onsuccess = e => {
+        if (!e.target.result) { resolve(null); return; }
+        const url = URL.createObjectURL(e.target.result.blob);
+        blobURLs[id] = url;
+        resolve(url);
+      };
+      req.onerror = e => reject(e.target.error);
+    });
+  }
+
+  // ── 释放不再需要的 objectURL ──
+  function revokeBlobURL(id) {
+    if (blobURLs[id]) {
+      URL.revokeObjectURL(blobURLs[id]);
+      delete blobURLs[id];
+    }
   }
 
   // ── 新增照片 ──
   function handlePhotos(e) {
     const files = Array.from(e.target.files);
     if (!files.length) return;
-    let loaded = 0;
+    let done = 0;
     files.forEach(file => {
-      const reader = new FileReader();
-      reader.onload = ev => {
-        photos.push(ev.target.result);
-        loaded++;
-        if (loaded === files.length) {
-          current = photos.length - 1;
-          savePhotos();
-          renderCarousel();
+      const id = Date.now() + '_' + Math.random().toString(36).slice(2);
+      putPhoto(id, file).then(() => {
+        photoOrder.push(id);
+        done++;
+        if (done === files.length) {
+          current = photoOrder.length - 1;
+          saveOrder().then(renderCarousel);
         }
-      };
-      reader.readAsDataURL(file);
+      });
     });
     e.target.value = '';
   }
 
   // ── 删除当前照片 ──
   function deletePhoto() {
-    if (photos.length === 0) return;
+    if (photoOrder.length === 0) return;
     if (!confirm('删除这张照片？')) return;
-    photos.splice(current, 1);
-    if (current >= photos.length) current = Math.max(0, photos.length - 1);
-    savePhotos();
-    renderCarousel();
+    const id = photoOrder[current];
+    photoOrder.splice(current, 1);
+    revokeBlobURL(id);
+    removePhoto(id);
+    if (current >= photoOrder.length) current = Math.max(0, photoOrder.length - 1);
+    saveOrder().then(renderCarousel);
   }
 
-  // ── 移动当前照片顺序（dir: -1 前移 / 1 后移） ──
+  // ── 移动顺序（dir: -1 前移 / 1 后移） ──
   function movePhoto(dir) {
-    if (photos.length < 2) return;
+    if (photoOrder.length < 2) return;
     const target = current + dir;
-    if (target < 0 || target >= photos.length) return;
-    // 交换
-    const tmp = photos[current];
-    photos[current] = photos[target];
-    photos[target] = tmp;
+    if (target < 0 || target >= photoOrder.length) return;
+    const tmp = photoOrder[current];
+    photoOrder[current] = photoOrder[target];
+    photoOrder[target]  = tmp;
     current = target;
-    savePhotos();
-    renderCarousel();
+    saveOrder().then(renderCarousel);
   }
 
-  // ── 渲染 DOM ──
+  // ── 渲染轮播 ──
   function renderCarousel() {
     const track   = document.getElementById('carouselTrack');
     const dots    = document.getElementById('carouselDots');
     const empty   = document.getElementById('emptySlide');
     const toolbar = document.getElementById('carouselToolbar');
 
-    Array.from(track.querySelectorAll('.carousel-slide.photo')).forEach(el => el.remove());
+    // 先清空旧 slide 并释放旧 URL
+    Array.from(track.querySelectorAll('.carousel-slide')).forEach(el => {
+      const img = el.querySelector('img');
+      if (img && img.src.startsWith('blob:')) {
+        // 不在这里 revoke，URL 由 blobURLs 统一管理
+      }
+      el.remove();
+    });
 
-    if (photos.length === 0) {
+    if (photoOrder.length === 0) {
       empty.style.display = '';
       dots.innerHTML = '';
       toolbar.style.display = 'none';
@@ -977,21 +1046,32 @@
     empty.style.display = 'none';
     toolbar.style.display = '';
 
-    photos.forEach((src, i) => {
-      const slide = document.createElement('div');
-      slide.className = 'carousel-slide photo';
-      const img = document.createElement('img');
-      img.src = src;
-      img.alt = '照片 ' + (i + 1);
-      slide.appendChild(img);
-      track.appendChild(slide);
-    });
-
-    if (current >= photos.length) current = photos.length - 1;
+    if (current >= photoOrder.length) current = photoOrder.length - 1;
     if (current < 0) current = 0;
 
+    // 先占位（避免异步加载期间布局闪烁）
+    photoOrder.forEach((id, i) => {
+      const slide = document.createElement('div');
+      slide.className = 'carousel-slide';
+      slide.dataset.id = id;
+      const img = document.createElement('img');
+      img.alt = '照片 ' + (i + 1);
+      img.style.opacity = '0';
+      img.style.transition = 'opacity 0.3s';
+      slide.appendChild(img);
+      track.appendChild(slide);
+
+      fetchBlobURL(id).then(url => {
+        if (url) {
+          img.src = url;
+          img.onload = () => { img.style.opacity = '1'; };
+        }
+      });
+    });
+
+    // 指示点
     dots.innerHTML = '';
-    photos.forEach((_, i) => {
+    photoOrder.forEach((_, i) => {
       const dot = document.createElement('div');
       dot.className = 'carousel-dot' + (i === current ? ' active' : '');
       dot.onclick = () => goTo(i);
@@ -1007,7 +1087,7 @@
     const prevBtn = document.getElementById('prevBtn');
     const nextBtn = document.getElementById('nextBtn');
 
-    if (photos.length === 0) {
+    if (photoOrder.length === 0) {
       track.style.transform = 'translateX(0)';
       prevBtn.style.display = 'none';
       nextBtn.style.display = 'none';
@@ -1015,8 +1095,8 @@
     }
 
     track.style.transform = 'translateX(' + (-current * 100) + '%)';
-    prevBtn.style.display = photos.length > 1 ? '' : 'none';
-    nextBtn.style.display = photos.length > 1 ? '' : 'none';
+    prevBtn.style.display = photoOrder.length > 1 ? '' : 'none';
+    nextBtn.style.display = photoOrder.length > 1 ? '' : 'none';
 
     Array.from(dots.children).forEach((d, i) => {
       d.classList.toggle('active', i === current);
@@ -1024,7 +1104,7 @@
   }
 
   function goTo(idx) {
-    current = (idx + photos.length) % photos.length;
+    current = (idx + photoOrder.length) % photoOrder.length;
     updateCarousel();
   }
   function carouselPrev() { goTo(current - 1); }
@@ -1041,9 +1121,17 @@
     });
   })();
 
-  // ── 初始化：从 localStorage 加载 ──
-  photos = loadPhotos();
-  renderCarousel();
+  // ── 初始化 ──
+  openDB().then(database => {
+    db = database;
+    return loadOrder();
+  }).then(order => {
+    photoOrder = order;
+    renderCarousel();
+  }).catch(err => {
+    console.error('IndexedDB 初始化失败', err);
+    renderCarousel();
+  });
 
   // ── 烟花 + 飘落花朵 ──
   (function () {
