@@ -986,7 +986,7 @@
       img.src = src;
       img.alt = '照片 ' + (i + 1);
       slide.appendChild(img);
-      track.appendChild(slide);
+      track.insertBefore(slide, empty);  // 插到 emptySlide 之前，保持 index 从 0 开始
     });
 
     if (current >= photos.length) current = photos.length - 1;
@@ -1016,11 +1016,7 @@
       return;
     }
 
-    // 空占位占 index 0，图片从 index 1 开始 → 偏移 = current+1
-    // 但空占位已隐藏（display:none），不影响 flex 宽度计算
-    // 实际 photo slides 是从 track 的第 1 个子节点开始（emptySlide 是第 0 个）
-    // 所以需要偏移 1 格
-    track.style.transform = 'translateX(' + (-(current + 1) * 100) + '%)';
+    track.style.transform = 'translateX(' + (-current * 100) + '%)';
     prevBtn.style.display = photos.length > 1 ? '' : 'none';
     nextBtn.style.display = photos.length > 1 ? '' : 'none';
 
